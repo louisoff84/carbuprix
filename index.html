@@ -3,134 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carbu-prix | Montpellier & Local</title>
+    <title>Carbu-prix | Montpellier-Lattes</title>
     <style>
         :root { --brand: #059669; --accent: #dc2626; --bg: #f3f4f6; }
-        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #1f2937; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
         .container { max-width: 500px; margin: 0 auto; }
-        
         header { text-align: center; margin-bottom: 20px; }
-        h1 { color: var(--brand); margin: 0; font-size: 2rem; letter-spacing: -1px; }
-        .subtitle { color: #6b7280; font-size: 0.9rem; margin-top: 5px; }
-
-        #status { 
-            text-align: center; font-size: 0.85rem; color: #6b7280; 
-            margin-bottom: 15px; background: white; padding: 12px; border-radius: 12px;
-            border: 1px solid #e5e7eb;
-        }
-
-        .btn-refresh { 
-            background: var(--brand); color: white; border: none; padding: 16px; 
-            border-radius: 14px; width: 100%; font-size: 1rem; font-weight: bold; 
-            cursor: pointer; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2); margin-bottom: 15px;
-        }
-
-        .card { 
-            background: white; padding: 20px; border-radius: 18px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 12px; 
-            position: relative; border: 1px solid #e5e7eb;
-        }
-
-        .price-tag { 
-            position: absolute; top: 18px; right: 18px; background: #fef2f2; 
-            color: var(--accent); padding: 8px 12px; border-radius: 10px; 
-            font-weight: 900; font-size: 1.4rem; border: 1px solid #fee2e2; 
-        }
-
-        .station-name { font-weight: 800; font-size: 1.1rem; color: #111827; display: block; margin-right: 90px; text-transform: uppercase; }
-        .fuel-type { display: inline-block; background: #374151; color: white; padding: 3px 10px; border-radius: 6px; font-weight: bold; font-size: 0.75rem; margin-top: 8px; }
-        
-        .details { font-size: 0.85rem; color: #6b7280; margin-top: 10px; line-height: 1.4; }
-
-        .maps-btn { 
-            display: flex; align-items: center; justify-content: center;
-            margin-top: 15px; background: #4285F4; color: white; 
-            text-decoration: none; font-size: 0.85rem; font-weight: bold; 
-            padding: 12px; border-radius: 12px; gap: 8px;
-        }
+        .status-box { background: white; border: 1px solid #ddd; padding: 12px; border-radius: 12px; font-size: 0.85rem; text-align: center; margin-bottom: 15px; }
+        .card { background: white; padding: 20px; border-radius: 18px; margin-bottom: 15px; position: relative; border: 1px solid #e5e7eb; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .price { position: absolute; top: 20px; right: 20px; font-size: 1.6rem; font-weight: 900; color: var(--accent); }
+        .station-name { font-weight: bold; font-size: 1.1rem; color: #111827; display: block; margin-right: 90px; }
+        .fuel-badge { display: inline-block; background: #374151; color: white; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; margin-top: 8px; font-weight: bold; }
+        .address { font-size: 0.85rem; color: #6b7280; margin-top: 10px; }
+        .btn-maps { display: block; text-align: center; margin-top: 15px; padding: 12px; background: #4285F4; color: white; text-decoration: none; border-radius: 10px; font-weight: bold; }
+        .btn-refresh { background: var(--brand); color: white; border: none; padding: 15px; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <header>
-        <h1>⛽ Carbu-prix</h1>
-        <p class="subtitle">Prix au litre à proximité</p>
-    </header>
-
-    <button class="btn-refresh" onclick="startApp()">📍 Actualiser ma position</button>
-    <div id="status">Détection GPS...</div>
-    
+    <header><h1>⛽ Carbu-prix</h1></header>
+    <button class="btn-refresh" onclick="getLocation()">📍 MA POSITION ACTUELLE</button>
+    <div id="status" class="status-box">Cliquez sur le bouton pour démarrer...</div>
     <div id="results"></div>
 </div>
 
 <script>
-    const API_URL = "https://api.craftpick.fr/carbu/api.php"; 
+    const API_URL = "https://api.craftpick.fr/carbu/api.php";
 
-    function startApp() {
-        const status = document.getElementById('status');
-        status.innerHTML = "📡 Localisation satellite en cours...";
-        
+    function getLocation() {
+        document.getElementById('status').innerHTML = "⏳ Localisation GPS en cours...";
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(fetchData, handleError, { 
-                enableHighAccuracy: true, 
+            navigator.geolocation.getCurrentPosition(sendPosition, showError, {
+                enableHighAccuracy: true,
                 timeout: 10000,
                 maximumAge: 0
             });
-        } else {
-            status.innerHTML = "❌ GPS non supporté.";
         }
     }
 
-    async function fetchData(pos) {
+    async function sendPosition(position) {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
         const status = document.getElementById('status');
-        const container = document.getElementById('results');
-        const { latitude, longitude } = pos.coords;
-
-        status.innerHTML = `📍 Montpellier (${latitude.toFixed(3)}, ${longitude.toFixed(3)})<br>Recherche des prix...`;
+        
+        status.innerHTML = `📍 Ma position : <b>${lat.toFixed(4)}, ${lon.toFixed(4)}</b><br>Chargement des stations les moins chères...`;
 
         try {
-            const res = await fetch(`${API_URL}?lat=${latitude}&lon=${longitude}&cb=${Math.random()}`);
-            const data = await res.json();
+            // Ajout d'un paramètre aléatoire pour forcer le rafraîchissement
+            const response = await fetch(`${API_URL}?lat=${lat}&lon=${lon}&_=${Date.now()}`);
+            const data = await response.json();
+
+            const container = document.getElementById('results');
+            container.innerHTML = "";
 
             if (data.results && data.results.length > 0) {
-                status.innerHTML = `✅ ${data.results.length} stations trouvées à ${new Date().toLocaleTimeString()}`;
-                container.innerHTML = "";
-                
+                status.innerHTML += " ✅";
                 data.results.forEach(s => {
                     const card = document.createElement('div');
                     card.className = 'card';
-                    
-                    // Lien Google Maps corrigé sans erreur de syntaxe
-                    const mapsUrl = "https://www.google.com/maps/search/?api=1&query=" + s.geom.lat + "," + s.geom.lon;
+                    // Utilisation des coordonnées de la station pour Google Maps
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${s.geom.lat},${s.geom.lon}`;
                     
                     card.innerHTML = `
-                        <div class="price-tag">${s.prix_valeur}€</div>
+                        <div class="price">${s.prix_valeur}€</div>
                         <span class="station-name">${s.nom || 'Station Service'}</span>
-                        <div class="fuel-type">${s.prix_nom}</div>
-                        <div class="details">
-                            ${s.adresse.toLowerCase()}, ${s.ville}
-                        </div>
-                        <a href="${mapsUrl}" target="_blank" class="maps-btn">
-                            🗺️ Itinéraire Google Maps
-                        </a>
+                        <div class="fuel-badge">${s.prix_nom}</div>
+                        <div class="address">${s.adresse.toLowerCase()}, ${s.ville}</div>
+                        <a href="${mapsUrl}" target="_blank" class="btn-maps">🗺️ Y ALLER (GOOGLE MAPS)</a>
                     `;
                     container.appendChild(card);
                 });
             } else {
-                status.innerHTML = "⚠️ Aucune station trouvée dans les 15km.";
+                status.innerHTML = "⚠️ Aucune station trouvée à moins de 15km de Lattes/Montpellier.";
             }
-        } catch (e) {
-            status.innerHTML = "❌ Erreur de connexion au serveur.";
+        } catch (error) {
+            status.innerHTML = "❌ Erreur de connexion à api.craftpick.fr";
         }
     }
 
-    function handleError(err) {
-        document.getElementById('status').innerHTML = "❌ GPS : " + err.message;
+    function showError(error) {
+        document.getElementById('status').innerHTML = "❌ Erreur GPS : " + error.message;
     }
 
-    window.onload = startApp;
+    // Lancement automatique
+    window.onload = getLocation;
 </script>
-
 </body>
 </html>
