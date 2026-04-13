@@ -2,76 +2,152 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carbu-Prix | TEST FINAL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Carbu-Prix | Comparateur de proximité</title>
+    
     <style>
-        body { font-family: sans-serif; background: #eee; margin: 0; padding: 10px; }
-        .diag { background: #000; color: #0f0; padding: 10px; font-family: monospace; font-size: 11px; border-radius: 5px; margin-bottom: 10px; }
-        .header { background: #fff; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 10px; border-bottom: 4px solid #10b981; }
-        .card { background: #fff; margin-bottom: 10px; padding: 15px; border-radius: 10px; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .price { position: absolute; top: 15px; right: 15px; font-size: 24px; font-weight: bold; color: #e11d48; }
-        .dist { color: #2563eb; font-weight: bold; font-size: 12px; }
-        .btn-go { display: block; background: #2563eb; color: #fff; text-align: center; padding: 10px; border-radius: 5px; text-decoration: none; margin-top: 10px; font-weight: bold; }
+        /* DESIGN MODERNE ET MOBILE-FIRST */
+        :root { --brand: #10b981; --bg: #f8fafc; --text: #1e293b; --danger: #e11d48; }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 15px; }
+
+        /* Bloc de contrôle GPS */
+        #debug-panel { 
+            background: #0f172a; color: #4ade80; padding: 10px; font-family: monospace; 
+            font-size: 11px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #334155;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        header { text-align: center; margin-bottom: 20px; }
+        h1 { font-size: 1.8rem; font-weight: 900; letter-spacing: -1px; color: var(--brand); }
+        .city-name { font-size: 1.2rem; font-weight: 700; color: #64748b; margin-top: 5px; }
+
+        /* Cartes des stations */
+        #results-list { display: flex; flex-direction: column; gap: 12px; }
+        .station-card { 
+            background: white; border-radius: 20px; padding: 18px; 
+            position: relative; border: 1px solid #e2e8f0; 
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); 
+        }
+        
+        .price-tag { 
+            position: absolute; top: 18px; right: 18px; text-align: right;
+            font-size: 1.8rem; font-weight: 900; color: var(--danger); letter-spacing: -1px;
+        }
+
+        .distance-badge { 
+            display: inline-flex; align-items: center; background: #f1f5f9; 
+            padding: 4px 10px; border-radius: 8px; font-size: 0.75rem; 
+            font-weight: 700; color: #475569; margin-bottom: 8px; 
+        }
+
+        .station-title { font-size: 1.05rem; font-weight: 800; width: 70%; text-transform: uppercase; margin-bottom: 4px; }
+        .fuel-label { display: inline-block; background: #334155; color: white; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; }
+        .address-text { font-size: 0.8rem; color: #94a3b8; margin-top: 10px; line-height: 1.4; }
+
+        /* Bouton Google Maps */
+        .btn-maps { 
+            display: block; text-align: center; background: #4285F4; color: white; 
+            text-decoration: none; padding: 14px; border-radius: 12px; 
+            margin-top: 15px; font-weight: 800; font-size: 0.9rem;
+            box-shadow: 0 4px 6px -1px rgba(66, 133, 244, 0.3);
+        }
+
+        .loader { text-align: center; padding: 50px; color: #94a3b8; font-weight: 600; }
     </style>
 </head>
 <body>
 
-    <div class="diag" id="debug">Diagnostic : En attente du GPS...</div>
+    <div id="debug-panel">Initialisation du système...</div>
 
-    <div class="header">
-        <div style="font-size: 12px; color: #666;">VILLE DÉTECTÉE :</div>
-        <div id="nom-ville" style="font-size: 20px; font-weight: bold;">Recherche...</div>
-    </div>
+    <header>
+        <h1>⛽ Carbu-Prix</h1>
+        <div id="display-city" class="city-name">Détection en cours...</div>
+    </header>
 
-    <div id="liste"></div>
+    <main id="results-list">
+        <div class="loader">🛰️ Connexion aux satellites...</div>
+    </main>
 
-<script>
-    const API = "https://api.craftpick.fr/carbu/api.php";
+    <script>
+        const API_ENDPOINT = "https://api.craftpick.fr/carbu/api.php";
 
-    function localiser() {
-        if (!navigator.geolocation) {
-            document.getElementById('debug').innerHTML = "Erreur : GPS non supporté";
-            return;
+        function updateStatus(msg) {
+            const panel = document.getElementById('debug-panel');
+            panel.innerHTML += "<br>> " + msg;
+            panel.scrollTop = panel.scrollHeight;
         }
 
-        navigator.geolocation.getCurrentPosition(async (p) => {
-            const lat = p.coords.latitude;
-            const lon = p.coords.longitude;
-            
-            // AFFICHAGE DEBUG
-            document.getElementById('debug').innerHTML = `GPS OK : Lat ${lat.toFixed(4)} | Lon ${lon.toFixed(4)}`;
-
-            try {
-                const r = await fetch(`${API}?lat=${lat}&lon=${lon}&cachebust=${Date.now()}`);
-                const d = await r.json();
-
-                document.getElementById('nom-ville').innerText = d.ville;
-                const container = document.getElementById('liste');
-                container.innerHTML = "";
-
-                d.stations.forEach(s => {
-                    container.innerHTML += `
-                        <div class="card">
-                            <div class="price">${s.prix}€</div>
-                            <div class="dist">📍 à ${s.dist} km</div>
-                            <b style="display:block; margin: 5px 0;">${s.nom}</b>
-                            <span style="background:#333; color:#fff; padding:2px 5px; border-radius:3px; font-size:10px;">${s.carbu}</span>
-                            <div style="font-size:11px; color:#666; margin-top:5px;">${s.ville}</div>
-                            <a href="https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lon}" class="btn-go">Y ALLER</a>
-                        </div>
-                    `;
-                });
-
-            } catch(e) {
-                document.getElementById('debug').innerHTML += "<br>Erreur API : " + e;
+        async function startApp() {
+            if (!navigator.geolocation) {
+                updateStatus("Erreur: GPS non supporté");
+                return;
             }
 
-        }, (err) => {
-            document.getElementById('debug').innerHTML = "Erreur GPS : " + err.message + " (Activez le GPS et soyez en HTTPS)";
-        }, { enableHighAccuracy: true, timeout: 5000 });
-    }
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const { latitude, longitude } = position.coords;
+                updateStatus(`Localisation OK: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
 
-    window.onload = localiser;
-</script>
+                try {
+                    updateStatus("Appel API Craftpick...");
+                    const response = await fetch(`${API_ENDPOINT}?lat=${latitude}&lon=${longitude}&cache=${Date.now()}`);
+                    const data = await response.json();
+
+                    // Affichage de la ville détectée par l'API
+                    document.getElementById('display-city').innerText = data.ville || "Proche de vous";
+                    
+                    const list = document.getElementById('results-list');
+                    list.innerHTML = ""; // Vider le loader
+
+                    const stations = data.stations || data.results || [];
+
+                    if (stations.length === 0) {
+                        list.innerHTML = "<div class='loader'>Désolé, aucune station trouvée ici.</div>";
+                        return;
+                    }
+
+                    stations.forEach(s => {
+                        const card = document.createElement('div');
+                        card.className = 'station-card';
+                        
+                        // Normalisation des données
+                        const nom = s.nom || "Station Service";
+                        const prix = s.prix || s.prix_valeur;
+                        const carbu = s.carbu || s.prix_nom;
+                        const distance = s.dist || s.distance || "?";
+                        const latS = s.lat || s.geom.lat;
+                        const lonS = s.lon || s.geom.lon;
+
+                        card.innerHTML = `
+                            <div class="distance-badge">📍 à ${distance} km</div>
+                            <div class="price-tag">${prix.toFixed(3)}€</div>
+                            <div class="station-title">${nom}</div>
+                            <div class="fuel-label">${carbu}</div>
+                            <div class="address-text">${s.adresse.toLowerCase()}</div>
+                            <a href="https://www.google.com/maps/dir/?api=1&destination=${latS},${lonS}" target="_blank" class="btn-maps">ITINÉRAIRE GOOGLE MAPS</a>
+                        `;
+                        list.appendChild(card);
+                    });
+
+                    updateStatus("Affichage réussi !");
+
+                } catch (err) {
+                    updateStatus("Erreur API: " + err.message);
+                    document.getElementById('results-list').innerHTML = "<div class='loader'>Erreur de connexion au serveur Craftpick.</div>";
+                }
+
+            }, (err) => {
+                updateStatus("Erreur GPS: " + err.message);
+                document.getElementById('results-list').innerHTML = "<div class='loader'>Merci d'activer le GPS.</div>";
+            }, {
+                enableHighAccuracy: true,
+                timeout: 15000
+            });
+        }
+
+        // Lancement au chargement de la page
+        window.onload = startApp;
+    </script>
 </body>
 </html>
