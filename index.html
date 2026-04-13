@@ -3,122 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carbu-prix | Les plus proches</title>
+    <title>Carbu-prix | Proximité</title>
     <style>
-        :root { --brand: #10b981; --accent: #3b82f6; --bg: #f3f4f6; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        :root { --main: #10b981; --bg: #f3f4f6; }
+        body { font-family: sans-serif; background: var(--bg); margin: 0; padding: 15px; }
         .container { max-width: 500px; margin: 0 auto; }
-        
-        header { text-align: center; margin-bottom: 15px; }
-        h1 { color: var(--brand); margin: 0; font-size: 1.8rem; }
-        
-        .city-header {
-            background: #fff; border-left: 5px solid var(--brand);
-            padding: 15px; border-radius: 8px; font-weight: bold;
-            font-size: 1.2rem; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            display: none;
-        }
-
-        .status { text-align: center; font-size: 0.8rem; color: #666; margin-bottom: 15px; }
-        
-        .card { background: white; padding: 20px; border-radius: 18px; margin-bottom: 12px; position: relative; border: 1px solid #e5e7eb; }
-        
-        /* Style pour le prix */
+        .header { text-align: center; background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .ville-nom { color: var(--main); font-weight: 900; font-size: 1.4rem; margin-top: 5px; display: block; }
+        .card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 10px; position: relative; border: 1px solid #ddd; }
         .price { position: absolute; top: 15px; right: 15px; color: #ef4444; font-weight: 900; font-size: 1.5rem; }
-        
-        /* Étiquette de distance */
-        .dist-badge { 
-            display: inline-block; background: #e0f2fe; color: var(--accent); 
-            padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; margin-bottom: 8px;
-        }
-
-        .name { font-weight: 800; font-size: 1rem; margin-right: 80px; display: block; text-transform: uppercase; }
-        .fuel { display: inline-block; background: #374151; color: white; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; margin-top: 5px; }
-        
-        .maps-btn { display: block; text-align: center; margin-top: 15px; padding: 12px; background: #4285F4; color: white; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 0.85rem; }
-        .refresh-btn { background: var(--brand); color: white; border: none; padding: 15px; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; }
+        .dist { display: inline-block; background: #dcfce7; color: #166534; padding: 3px 8px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; }
+        .name { font-weight: bold; display: block; margin: 5px 0; text-transform: uppercase; width: 70%; }
+        .fuel { background: #374151; color: white; padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
+        .btn-maps { display: block; text-align: center; background: #4285F4; color: white; text-decoration: none; padding: 12px; border-radius: 10px; margin-top: 10px; font-weight: bold; font-size: 0.8rem; }
+        .loading { text-align: center; color: #666; font-size: 0.9rem; padding: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <header><h1>⛽ Carbu-prix</h1></header>
+    <div class="header">
+        <span style="font-size: 0.8rem; color: #666;">MA VILLE ACTUELLE :</span>
+        <span id="ville-header" class="ville-nom">Détection...</span>
+    </div>
 
-    <div id="city-info" class="city-header"></div>
-
-    <button class="refresh-btn" onclick="startApp()">📍 TROUVER LES PLUS PROCHES</button>
-    <div id="status" class="status">Détection de votre ville...</div>
-    
+    <div id="status" class="loading">📡 Activation du GPS...</div>
     <div id="results"></div>
 </div>
 
 <script>
     const API_URL = "https://api.craftpick.fr/carbu/api.php";
 
-    function startApp() {
-        const status = document.getElementById('status');
-        status.innerHTML = "📡 Calcul de la position...";
-        
+    async function start() {
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
+            const { latitude, longitude } = pos.coords;
+            const status = document.getElementById('status');
             
-            // 1. Identification de la ville
             try {
-                const geo = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=fr`);
-                const geoData = await geo.json();
-                const city = geoData.city || geoData.locality || "Secteur";
-                
-                const cityDiv = document.getElementById('city-info');
-                cityDiv.innerHTML = "📍 " + city + " (Stations les plus proches)";
-                cityDiv.style.display = "block";
-            } catch(e) {}
+                const res = await fetch(`${API_URL}?lat=${latitude}&lon=${longitude}&t=${Date.now()}`);
+                const data = await res.json();
 
-            // 2. Récupération des données triées
-            fetchData(lat, lon);
-        }, (err) => {
-            status.innerHTML = "❌ Erreur GPS : " + err.message;
-        }, { enableHighAccuracy: true });
-    }
+                document.getElementById('ville-header').innerText = data.ville_detectee;
+                status.style.display = 'none';
 
-    async function fetchData(lat, lon) {
-        const status = document.getElementById('status');
-        const container = document.getElementById('results');
-        status.innerHTML = "🔍 Recherche des stations à proximité...";
-
-        try {
-            const res = await fetch(`${API_URL}?lat=${lat}&lon=${lon}&t=${Date.now()}`);
-            const data = await res.json();
-
-            if (data.results && data.results.length > 0) {
-                status.innerHTML = "✅ Stations classées par proximité.";
+                const container = document.getElementById('results');
                 container.innerHTML = "";
-                
+
                 data.results.forEach(s => {
                     const card = document.createElement('div');
                     card.className = 'card';
-                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${s.geom.lat},${s.geom.lon}`;
-                    const distanceLabel = s.dist_km ? s.dist_km.toFixed(1) + " km" : "Près de vous";
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lon}`;
                     
                     card.innerHTML = `
-                        <div class="dist-badge">📍 à ${distanceLabel}</div>
-                        <div class="price">${s.prix_valeur}€</div>
-                        <span class="name">${s.nom || 'Station Service'}</span>
-                        <div class="fuel">${s.prix_nom}</div>
-                        <div style="font-size:0.8rem; color:#666; margin-top:10px;">${s.adresse.toLowerCase()}</div>
-                        <a href="${mapsUrl}" target="_blank" class="maps-btn">S'Y RENDRE</a>
+                        <div class="dist">📍 à ${s.distance} km</div>
+                        <div class="price">${s.prix}€</div>
+                        <span class="name">${s.nom}</span>
+                        <span class="fuel">${s.carbu}</span>
+                        <div style="font-size:0.75rem; color:#666; margin-top:8px;">${s.adresse.toLowerCase()}</div>
+                        <a href="${mapsUrl}" target="_blank" class="btn-maps">NAVIGUER VERS LA STATION</a>
                     `;
                     container.appendChild(card);
                 });
-            } else {
-                status.innerHTML = "⚠️ Aucune station trouvée.";
+            } catch (e) {
+                status.innerText = "❌ Erreur de chargement des données.";
             }
-        } catch (e) {
-            status.innerHTML = "❌ Erreur serveur.";
-        }
+        }, (err) => {
+            document.getElementById('status').innerText = "❌ GPS refusé ou indisponible.";
+        }, { enableHighAccuracy: true });
     }
 
-    window.onload = startApp;
+    window.onload = start;
 </script>
 </body>
 </html>
