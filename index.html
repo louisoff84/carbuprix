@@ -3,21 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carbu-prix | Prix du carburant en temps réel</title>
+    <title>Carbu-prix | Montpellier & Local</title>
     <style>
         :root { --brand: #059669; --accent: #dc2626; --bg: #f3f4f6; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #1f2937; }
-        .container { max-width: 600px; margin: 0 auto; }
-        header { text-align: center; margin-bottom: 30px; }
-        h1 { color: var(--brand); margin-bottom: 5px; font-size: 2.2rem; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 15px; position: relative; border-left: 6px solid var(--brand); }
-        .station-name { font-weight: bold; font-size: 1.1rem; color: #111827; display: block; margin-right: 90px; text-transform: uppercase; }
-        .details { font-size: 0.85rem; color: #6b7280; margin-top: 8px; line-height: 1.4; }
-        .price-tag { position: absolute; top: 20px; right: 20px; background: #ecfdf5; color: var(--accent); padding: 8px 12px; border-radius: 10px; font-weight: 900; font-size: 1.3rem; border: 1px solid #d1fae5; }
-        #status { text-align: center; font-size: 0.9rem; color: #6b7280; margin-bottom: 20px; font-weight: 500; }
-        .btn { background: var(--brand); color: white; border: none; padding: 14px; border-radius: 12px; width: 100%; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3); }
-        .btn:active { transform: scale(0.98); }
-        .fuel-type { display: inline-block; background: #e5e7eb; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; margin-top: 5px; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: #1f2937; }
+        .container { max-width: 500px; margin: 0 auto; }
+        
+        header { text-align: center; margin-bottom: 20px; }
+        h1 { color: var(--brand); margin: 0; font-size: 2rem; letter-spacing: -1px; }
+        .subtitle { color: #6b7280; font-size: 0.9rem; margin-top: 5px; }
+
+        #status { 
+            text-align: center; font-size: 0.85rem; color: #6b7280; 
+            margin-bottom: 15px; background: white; padding: 12px; border-radius: 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .btn-refresh { 
+            background: var(--brand); color: white; border: none; padding: 16px; 
+            border-radius: 14px; width: 100%; font-size: 1rem; font-weight: bold; 
+            cursor: pointer; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2); margin-bottom: 15px;
+        }
+
+        .card { 
+            background: white; padding: 20px; border-radius: 18px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 12px; 
+            position: relative; border: 1px solid #e5e7eb;
+        }
+
+        .price-tag { 
+            position: absolute; top: 18px; right: 18px; background: #fef2f2; 
+            color: var(--accent); padding: 8px 12px; border-radius: 10px; 
+            font-weight: 900; font-size: 1.4rem; border: 1px solid #fee2e2; 
+        }
+
+        .station-name { font-weight: 800; font-size: 1.1rem; color: #111827; display: block; margin-right: 90px; text-transform: uppercase; }
+        .fuel-type { display: inline-block; background: #374151; color: white; padding: 3px 10px; border-radius: 6px; font-weight: bold; font-size: 0.75rem; margin-top: 8px; }
+        
+        .details { font-size: 0.85rem; color: #6b7280; margin-top: 10px; line-height: 1.4; }
+
+        .maps-btn { 
+            display: flex; align-items: center; justify-content: center;
+            margin-top: 15px; background: #4285F4; color: white; 
+            text-decoration: none; font-size: 0.85rem; font-weight: bold; 
+            padding: 12px; border-radius: 12px; gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -25,83 +55,81 @@
 <div class="container">
     <header>
         <h1>⛽ Carbu-prix</h1>
-        <p>Le plein le moins cher autour de vous</p>
+        <p class="subtitle">Prix au litre à proximité</p>
     </header>
 
-    <button class="btn" onclick="startApp()">📍 Actualiser ma position</button>
-    <div id="status">En attente du GPS...</div>
+    <button class="btn-refresh" onclick="startApp()">📍 Actualiser ma position</button>
+    <div id="status">Détection GPS...</div>
     
     <div id="results"></div>
 </div>
 
 <script>
-    // Ton API est maintenant configurée ici
     const API_URL = "https://api.craftpick.fr/carbu/api.php"; 
 
     function startApp() {
         const status = document.getElementById('status');
-        status.innerHTML = "⏳ Recherche de votre position...";
+        status.innerHTML = "📡 Localisation satellite en cours...";
         
         if (navigator.geolocation) {
-            // Options pour plus de précision
-            const options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 };
-            navigator.geolocation.getCurrentPosition(getFuelPrices, handleError, options);
+            navigator.geolocation.getCurrentPosition(fetchData, handleError, { 
+                enableHighAccuracy: true, 
+                timeout: 10000,
+                maximumAge: 0
+            });
         } else {
             status.innerHTML = "❌ GPS non supporté.";
         }
     }
 
-    async function getFuelPrices(position) {
+    async function fetchData(pos) {
         const status = document.getElementById('status');
         const container = document.getElementById('results');
-        const { latitude, longitude } = position.coords;
+        const { latitude, longitude } = pos.coords;
 
-        status.innerHTML = "🔍 Recherche des stations les moins chères...";
+        status.innerHTML = `📍 Montpellier (${latitude.toFixed(3)}, ${longitude.toFixed(3)})<br>Recherche des prix...`;
 
         try {
-            const response = await fetch(`${API_URL}?lat=${latitude}&lon=${longitude}`);
-            const data = await response.json();
+            const res = await fetch(`${API_URL}?lat=${latitude}&lon=${longitude}&cb=${Math.random()}`);
+            const data = await res.json();
 
             if (data.results && data.results.length > 0) {
-                status.innerHTML = `✅ Mis à jour à ${new Date().toLocaleTimeString()}`;
+                status.innerHTML = `✅ ${data.results.length} stations trouvées à ${new Date().toLocaleTimeString()}`;
                 container.innerHTML = "";
                 
-                data.results.forEach(station => {
+                data.results.forEach(s => {
                     const card = document.createElement('div');
                     card.className = 'card';
-                    // Formatage de la date de mise à jour
-                    const dateMaj = new Date(station.prix_maj).toLocaleDateString('fr-FR');
+                    
+                    // Lien Google Maps corrigé sans erreur de syntaxe
+                    const mapsUrl = "https://www.google.com/maps/search/?api=1&query=" + s.geom.lat + "," + s.geom.lon;
                     
                     card.innerHTML = `
-                        <div class="price-tag">${station.prix_valeur}€</div>
-                        <span class="station-name">${station.nom || 'Station Service'}</span>
-                        <div class="fuel-type">${station.prix_nom}</div>
+                        <div class="price-tag">${s.prix_valeur}€</div>
+                        <span class="station-name">${s.nom || 'Station Service'}</span>
+                        <div class="fuel-type">${s.prix_nom}</div>
                         <div class="details">
-                            ${station.adresse.toLowerCase()}, ${station.ville}<br>
-                            <em>Dernière mise à jour : ${dateMaj}</em>
+                            ${s.adresse.toLowerCase()}, ${s.ville}
                         </div>
+                        <a href="${mapsUrl}" target="_blank" class="maps-btn">
+                            🗺️ Itinéraire Google Maps
+                        </a>
                     `;
                     container.appendChild(card);
                 });
             } else {
-                status.innerHTML = "⚠️ Aucune station trouvée à moins de 15km.";
+                status.innerHTML = "⚠️ Aucune station trouvée dans les 15km.";
             }
         } catch (e) {
-            status.innerHTML = "❌ Erreur de connexion à l'API.";
-            console.error(e);
+            status.innerHTML = "❌ Erreur de connexion au serveur.";
         }
     }
 
     function handleError(err) {
-        const status = document.getElementById('status');
-        status.innerHTML = "❌ Erreur GPS : " + err.message + ". Vérifiez que vous êtes en HTTPS.";
+        document.getElementById('status').innerHTML = "❌ GPS : " + err.message;
     }
 
-    // Lancement auto
     window.onload = startApp;
-
-    // Rafraîchissement automatique toutes les 30 secondes
-    setInterval(startApp, 30000);
 </script>
 
 </body>
