@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carbu-prix | Prix du carburant en temps réel</title>
+    <style>
+        :root { --brand: #059669; --accent: #dc2626; --bg: #f3f4f6; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #1f2937; }
+        .container { max-width: 600px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 30px; }
+        h1 { color: var(--brand); margin-bottom: 5px; font-size: 2.2rem; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 15px; position: relative; border-left: 6px solid var(--brand); }
+        .station-name { font-weight: bold; font-size: 1.1rem; color: #111827; display: block; margin-right: 90px; text-transform: uppercase; }
+        .details { font-size: 0.85rem; color: #6b7280; margin-top: 8px; line-height: 1.4; }
+        .price-tag { position: absolute; top: 20px; right: 20px; background: #ecfdf5; color: var(--accent); padding: 8px 12px; border-radius: 10px; font-weight: 900; font-size: 1.3rem; border: 1px solid #d1fae5; }
+        #status { text-align: center; font-size: 0.9rem; color: #6b7280; margin-bottom: 20px; font-weight: 500; }
+        .btn { background: var(--brand); color: white; border: none; padding: 14px; border-radius: 12px; width: 100%; font-size: 1rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3); }
+        .btn:active { transform: scale(0.98); }
+        .fuel-type { display: inline-block; background: #e5e7eb; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>⛽ Carbu-prix</h1>
+        <p>Le plein le moins cher autour de vous</p>
+    </header>
+
+    <button class="btn" onclick="startApp()">📍 Actualiser ma position</button>
+    <div id="status">En attente du GPS...</div>
+    
+    <div id="results"></div>
+</div>
+
+<script>
+    // Ton API est maintenant configurée ici
+    const API_URL = "https://api.craftpick.fr/carbu/api.php"; 
+
+    function startApp() {
+        const status = document.getElementById('status');
+        status.innerHTML = "⏳ Recherche de votre position...";
+        
+        if (navigator.geolocation) {
+            // Options pour plus de précision
+            const options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 };
+            navigator.geolocation.getCurrentPosition(getFuelPrices, handleError, options);
+        } else {
+            status.innerHTML = "❌ GPS non supporté.";
+        }
+    }
+
+    async function getFuelPrices(position) {
+        const status = document.getElementById('status');
+        const container = document.getElementById('results');
+        const { latitude, longitude } = position.coords;
+
+        status.innerHTML = "🔍 Recherche des stations les moins chères...";
+
+        try {
+            const response = await fetch(`${API_URL}?lat=${latitude}&lon=${longitude}`);
+            const data = await response.json();
+
+            if (data.results && data.results.length > 0) {
+                status.innerHTML = `✅ Mis à jour à ${new Date().toLocaleTimeString()}`;
+                container.innerHTML = "";
+                
+                data.results.forEach(station => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    // Formatage de la date de mise à jour
+                    const dateMaj = new Date(station.prix_maj).toLocaleDateString('fr-FR');
+                    
+                    card.innerHTML = `
+                        <div class="price-tag">${station.prix_valeur}€</div>
+                        <span class="station-name">${station.nom || 'Station Service'}</span>
+                        <div class="fuel-type">${station.prix_nom}</div>
+                        <div class="details">
+                            ${station.adresse.toLowerCase()}, ${station.ville}<br>
+                            <em>Dernière mise à jour : ${dateMaj}</em>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } else {
+                status.innerHTML = "⚠️ Aucune station trouvée à moins de 15km.";
+            }
+        } catch (e) {
+            status.innerHTML = "❌ Erreur de connexion à l'API.";
+            console.error(e);
+        }
+    }
+
+    function handleError(err) {
+        const status = document.getElementById('status');
+        status.innerHTML = "❌ Erreur GPS : " + err.message + ". Vérifiez que vous êtes en HTTPS.";
+    }
+
+    // Lancement auto
+    window.onload = startApp;
+
+    // Rafraîchissement automatique toutes les 30 secondes
+    setInterval(startApp, 30000);
+</script>
+
+</body>
+</html>
