@@ -3,76 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carbu-prix | Proximité</title>
+    <title>Carbu-Prix | TEST FINAL</title>
     <style>
-        :root { --main: #10b981; --bg: #f3f4f6; }
-        body { font-family: sans-serif; background: var(--bg); margin: 0; padding: 15px; }
-        .container { max-width: 500px; margin: 0 auto; }
-        .header { text-align: center; background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .ville-nom { color: var(--main); font-weight: 900; font-size: 1.4rem; margin-top: 5px; display: block; }
-        .card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 10px; position: relative; border: 1px solid #ddd; }
-        .price { position: absolute; top: 15px; right: 15px; color: #ef4444; font-weight: 900; font-size: 1.5rem; }
-        .dist { display: inline-block; background: #dcfce7; color: #166534; padding: 3px 8px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; }
-        .name { font-weight: bold; display: block; margin: 5px 0; text-transform: uppercase; width: 70%; }
-        .fuel { background: #374151; color: white; padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
-        .btn-maps { display: block; text-align: center; background: #4285F4; color: white; text-decoration: none; padding: 12px; border-radius: 10px; margin-top: 10px; font-weight: bold; font-size: 0.8rem; }
-        .loading { text-align: center; color: #666; font-size: 0.9rem; padding: 20px; }
+        body { font-family: sans-serif; background: #eee; margin: 0; padding: 10px; }
+        .diag { background: #000; color: #0f0; padding: 10px; font-family: monospace; font-size: 11px; border-radius: 5px; margin-bottom: 10px; }
+        .header { background: #fff; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 10px; border-bottom: 4px solid #10b981; }
+        .card { background: #fff; margin-bottom: 10px; padding: 15px; border-radius: 10px; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .price { position: absolute; top: 15px; right: 15px; font-size: 24px; font-weight: bold; color: #e11d48; }
+        .dist { color: #2563eb; font-weight: bold; font-size: 12px; }
+        .btn-go { display: block; background: #2563eb; color: #fff; text-align: center; padding: 10px; border-radius: 5px; text-decoration: none; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="container">
+    <div class="diag" id="debug">Diagnostic : En attente du GPS...</div>
+
     <div class="header">
-        <span style="font-size: 0.8rem; color: #666;">MA VILLE ACTUELLE :</span>
-        <span id="ville-header" class="ville-nom">Détection...</span>
+        <div style="font-size: 12px; color: #666;">VILLE DÉTECTÉE :</div>
+        <div id="nom-ville" style="font-size: 20px; font-weight: bold;">Recherche...</div>
     </div>
 
-    <div id="status" class="loading">📡 Activation du GPS...</div>
-    <div id="results"></div>
-</div>
+    <div id="liste"></div>
 
 <script>
-    const API_URL = "https://api.craftpick.fr/carbu/api.php";
+    const API = "https://api.craftpick.fr/carbu/api.php";
 
-    async function start() {
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            const status = document.getElementById('status');
+    function localiser() {
+        if (!navigator.geolocation) {
+            document.getElementById('debug').innerHTML = "Erreur : GPS non supporté";
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(async (p) => {
+            const lat = p.coords.latitude;
+            const lon = p.coords.longitude;
             
+            // AFFICHAGE DEBUG
+            document.getElementById('debug').innerHTML = `GPS OK : Lat ${lat.toFixed(4)} | Lon ${lon.toFixed(4)}`;
+
             try {
-                const res = await fetch(`${API_URL}?lat=${latitude}&lon=${longitude}&t=${Date.now()}`);
-                const data = await res.json();
+                const r = await fetch(`${API}?lat=${lat}&lon=${lon}&cachebust=${Date.now()}`);
+                const d = await r.json();
 
-                document.getElementById('ville-header').innerText = data.ville_detectee;
-                status.style.display = 'none';
-
-                const container = document.getElementById('results');
+                document.getElementById('nom-ville').innerText = d.ville;
+                const container = document.getElementById('liste');
                 container.innerHTML = "";
 
-                data.results.forEach(s => {
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lon}`;
-                    
-                    card.innerHTML = `
-                        <div class="dist">📍 à ${s.distance} km</div>
-                        <div class="price">${s.prix}€</div>
-                        <span class="name">${s.nom}</span>
-                        <span class="fuel">${s.carbu}</span>
-                        <div style="font-size:0.75rem; color:#666; margin-top:8px;">${s.adresse.toLowerCase()}</div>
-                        <a href="${mapsUrl}" target="_blank" class="btn-maps">NAVIGUER VERS LA STATION</a>
+                d.stations.forEach(s => {
+                    container.innerHTML += `
+                        <div class="card">
+                            <div class="price">${s.prix}€</div>
+                            <div class="dist">📍 à ${s.dist} km</div>
+                            <b style="display:block; margin: 5px 0;">${s.nom}</b>
+                            <span style="background:#333; color:#fff; padding:2px 5px; border-radius:3px; font-size:10px;">${s.carbu}</span>
+                            <div style="font-size:11px; color:#666; margin-top:5px;">${s.ville}</div>
+                            <a href="https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lon}" class="btn-go">Y ALLER</a>
+                        </div>
                     `;
-                    container.appendChild(card);
                 });
-            } catch (e) {
-                status.innerText = "❌ Erreur de chargement des données.";
+
+            } catch(e) {
+                document.getElementById('debug').innerHTML += "<br>Erreur API : " + e;
             }
+
         }, (err) => {
-            document.getElementById('status').innerText = "❌ GPS refusé ou indisponible.";
-        }, { enableHighAccuracy: true });
+            document.getElementById('debug').innerHTML = "Erreur GPS : " + err.message + " (Activez le GPS et soyez en HTTPS)";
+        }, { enableHighAccuracy: true, timeout: 5000 });
     }
 
-    window.onload = start;
+    window.onload = localiser;
 </script>
 </body>
 </html>
